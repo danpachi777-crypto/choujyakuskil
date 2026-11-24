@@ -1,0 +1,4 @@
+interface:
+  display_name: "ネコ王の研究所 横長反応集"
+  short_description: "実在のスレ・投稿を調べ、読み上げ・字幕付きの横長反応集を制作"
+  default_prompt: "$neko-ou-longform を使い、指定した題材の横長反応集を作ってください。"
