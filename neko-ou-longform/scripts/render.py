@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
-from background import ART_BOX, FOOTAGE_BOX, footage_filter, footage_inputs
+from background import ART_BOX, FOOTAGE_BOX, footage_filter, footage_inputs, prepare_footage
 from project import FPS, RATE, ROOT, asset, audit, need, prepare, publication, write_json
 
 W, H = 1920, 1080
@@ -189,7 +189,7 @@ def stage(project,cue,style,staging):
     return box, bg
 
 
-def run_picture(writer,project,cue,style,staging,offset,count,end):
+def run_picture(writer,project,cue,style,staging,offset,count,end,background_path):
     box,bg=stage(project,cue,style,staging)
     x,y,width,height=box
     inputs=['-loop','1','-framerate',str(FPS),'-i',str(staging/'base.png')]
@@ -217,7 +217,7 @@ def run_picture(writer,project,cue,style,staging,offset,count,end):
     if bg:
         index=inputs.count('-i')
         position=cue['start']/FPS+bg['offset']
-        inputs+=footage_inputs(asset(project.root,bg['file']),position,bg['duration'])
+        inputs+=footage_inputs(background_path,position)
         bx,by,_,_=FOOTAGE_BOX
         filters+=';'+footage_filter(index,bg['focus'],bg['fit'])+f';[scene][footage]overlay={bx}:{by}[composite]'
         scene='composite'
@@ -297,6 +297,10 @@ def render(project,out,start,stop,preview,preset):
     with tempfile.TemporaryDirectory(prefix='neko-ou-',dir=out.parent) as temp:
         stage_dir=Path(temp)
         audio=stage_dir/'sound.m4a'
+        background_path=None
+        if bg:=project.data.get('background'):
+            path=asset(project.root,bg['file'])
+            background_path=prepare_footage(path,bg['duration'],stop/FPS+bg['offset']+.12,stage_dir/'continuous-background.mp4')
         mix(project,start,stop,audio)
         publication(project,stage_dir)
         target=stage_dir/'video.mp4'
@@ -317,7 +321,7 @@ def render(project,out,start,stop,preview,preset):
                 a=max(start,cue['start'])
                 b=min(stop,cue['start']+cue['frames'])
                 if a<b:
-                    run_picture(writer,project,cue,style,stage_dir,a-cue['start'],b-a,i==len(project.cues)-1)
+                    run_picture(writer,project,cue,style,stage_dir,a-cue['start'],b-a,i==len(project.cues)-1,background_path)
                     if i%8==0 or cue['role']=='eyecatch':
                         print(f'{b/FPS:.2f}秒 / {project.frames/FPS:.2f}秒',flush=True)
             writer.stdin.close()

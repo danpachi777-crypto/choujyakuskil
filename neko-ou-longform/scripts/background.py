@@ -1,5 +1,8 @@
 """The landscape layout for a moving secondary picture behind the story and captions."""
 
+import subprocess
+
+
 ART_BOX = (62, 130, 1048, 590)
 FOOTAGE_BOX = (1150, 132, 724, 664)
 
@@ -16,6 +19,21 @@ def footage_filter(stream, focus=0.5, fit="cover"):
     return f'[{stream}:v]fps=30,{sizing},setsar=1,format=yuv420p[footage]'
 
 
-def footage_inputs(path, position, duration):
-    # The start of each subtitle resumes the same continuous background timeline.
-    return ['-stream_loop','-1','-ss',str(position % duration),'-i',str(path)]
+def prepare_footage(source, source_seconds, required_seconds, proxy):
+    """Build a seekable continuous track when the footage must repeat."""
+    if required_seconds <= source_seconds:
+        return source
+    # Combining -stream_loop with an input seek can replay only the tail.
+    subprocess.run([
+        'ffmpeg','-nostdin','-v','error','-y','-stream_loop','-1','-i',str(source),
+        '-t',str(required_seconds),'-map','0:v:0','-an',
+        '-vf',"fps=30,scale='min(1600,iw)':-2:flags=lanczos,setsar=1,format=yuv420p",
+        '-c:v','libx264','-threads','4','-preset','ultrafast','-crf','21',
+        '-write_tmcd','0','-movflags','+faststart',str(proxy),
+    ], check=True)
+    return proxy
+
+
+def footage_inputs(path, position):
+    """Seek in seconds from the start of the continuous background track."""
+    return ['-ss',str(position),'-i',str(path)]
