@@ -118,6 +118,19 @@ def prepare(manifest, preview=False):
     http(channel['url'], 'channel.url')
     if channel.get('icon'):
         asset(root, channel['icon'])
+    if bg:=data.get('background'):
+        movie=asset(root,bg['file'])
+        need(isinstance(bg.get('label'),str) and bg['label'].strip(), '背景映像の短い表示名を入力してください')
+        need(isinstance(bg.get('source_title'),str) and bg['source_title'].strip(), '背景映像の出典名を入力してください')
+        if bg.get('source_url'):
+            http(bg['source_url'], 'background.source_url')
+        else:
+            need(bg.get('origin')=='self_recorded', '背景映像のURL、または自分で録画した素材と分かるoriginを指定してください')
+        bg['focus']=number(bg.get('focus',.5),'background.focus',0,1)
+        bg['fit']=bg.get('fit','cover')
+        need(bg['fit'] in ('cover','contain'),'background.fitはcoverまたはcontainを指定してください')
+        bg['offset']=number(bg.get('offset',0),'background.offset')
+        bg['duration']=seconds(movie,'video')
     if data.get('cover'):
         asset(root, data['cover'])
     for credit in data.get('credits', []):
@@ -288,6 +301,11 @@ def publication(project, folder):
         description.append('\n'.join(f'{yt_time(f)} {label}' for f,label in yt))
     credits = [c['label']+('\n'+c['url'] if c.get('url') else '') for c in project.data.get('credits',[])]
     credits.extend(dict.fromkeys(f"{'BGM' if a['kind']=='bgm' else '効果音'}　{a['title']}\n{a['url']}" for a in project.data.get('audio',[])))
+    if bg:=project.data.get('background'):
+        line='背景映像　'+bg['source_title']
+        if bg.get('source_url'):
+            line+='\n'+bg['source_url']
+        credits.append(line)
     if credits:
         description.append('\n\n'.join(credits))
     (folder/'YouTube概要欄.txt').write_text('\n\n'.join(p for p in description if p)+'\n', encoding='utf-8')

@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
+from background import ART_BOX, FOOTAGE_BOX, footage_filter, footage_inputs
 from project import FPS, RATE, ROOT, asset, audit, need, prepare, publication, write_json
 
 W, H = 1920, 1080
@@ -161,13 +162,23 @@ def stage(project,cue,style,staging):
     src=asset(project.root,cue['visual'])
     im=poster(src,cue['visual_offset'],staging)
     card=cue['role'] in {'opening','eyecatch','closing'}
-    box=(0,0,W,H) if card else (279,60,1362,766)
+    bg=project.data.get('background') if not card else None
+    box=(0,0,W,H) if card else ART_BOX if bg else (279,60,1362,766)
     n=box[2:]
     base=crop(im,(W,H),'cover')
     if not card:
         base=base.resize((480,270)).filter(ImageFilter.GaussianBlur(12)).resize((W,H))
         base=Image.blend(base,Image.new('RGB',(W,H),INK),.72)
     overlay=overlay_for(project,cue,style)
+    if bg:
+        d=ImageDraw.Draw(overlay)
+        bx,by,bw,bh=FOOTAGE_BOX
+        d.rectangle((bx-2,by-2,bx+bw+1,by+bh+1),outline='#a08b66',width=2)
+        d.rounded_rectangle((bx,72,bx+bw,121),12,fill=(13,23,41,250))
+        f=font(37,'display')
+        need(f.getlength(bg['label'])<=bw-30,'背景映像の画面表示名を短くしてください')
+        d.text((bx+15,96),bg['label'],font=f,anchor='lm',fill=GOLD)
+
     if cue['motion']=='still':
         base.paste(crop(im,n,cue['fit']),box[:2])
         base.paste(overlay,(0,0),overlay)
@@ -175,11 +186,12 @@ def stage(project,cue,style,staging):
         crop(im,n,cue['fit']).save(staging/'still.png')
         overlay.save(staging/'overlay.png')
     base.save(staging/'base.png')
-    return box
+    return box, bg
 
 
 def run_picture(writer,project,cue,style,staging,offset,count,end):
-    x,y,width,height=stage(project,cue,style,staging)
+    box,bg=stage(project,cue,style,staging)
+    x,y,width,height=box
     inputs=['-loop','1','-framerate',str(FPS),'-i',str(staging/'base.png')]
     rgb='scale=in_range=full:out_range=limited:out_color_matrix=bt709'
     if cue['motion']=='still':
@@ -201,8 +213,16 @@ def run_picture(writer,project,cue,style,staging,offset,count,end):
         inputs+=['-loop','1','-framerate',str(FPS),'-i',str(staging/'overlay.png')]
         filters=(f'[0:v]{rgb},format=yuv420p[b];{motion}setsar=1[m];[b][m]overlay={x}:{y}[back];'
                  f'[2:v]{rgb},format=yuva420p[o];[back][o]overlay=0:0[scene]')
+    scene='scene'
+    if bg:
+        index=inputs.count('-i')
+        position=cue['start']/FPS+bg['offset']
+        inputs+=footage_inputs(asset(project.root,bg['file']),position,bg['duration'])
+        bx,by,_,_=FOOTAGE_BOX
+        filters+=';'+footage_filter(index,bg['focus'],bg['fit'])+f';[scene][footage]overlay={bx}:{by}[composite]'
+        scene='composite'
     fade = ',fade=t=out:st='+str(max(0,(cue['frames']-20)/FPS))+':d='+str(min(19,cue['frames']-1)/FPS) if end and cue['frames']>1 else ''
-    filters += f';[scene]setsar=1{fade},trim=start_frame={offset}:end_frame={offset+count},setpts=PTS-STARTPTS[v]'
+    filters += f';[{scene}]setsar=1{fade},trim=start_frame={offset}:end_frame={offset+count},setpts=PTS-STARTPTS[v]'
     subprocess.run(FF+inputs+['-filter_complex_threads','2','-filter_complex',filters,'-map','[v]','-frames:v',str(count),
                                '-threads','1','-f','rawvideo','-pix_fmt','yuv420p','-'],
                    stdout=writer.stdin,check=True)

@@ -17,6 +17,7 @@ python3 "$skill/scripts/project.py" init "$HOME/Movies/新規の題材名"
 | min_seconds | 完成品の下限。通常480。尺の指定がある場合は変更する。 |
 | channel | name、handle、url、icon。初期値はネコ王の研究所。 |
 | cover | 作成済みのJPEG・PNGサムネイル。必要な場合に指定すると完成動画と同じフォルダへコピー。 |
+| background | 背景を別の動画として出す設定。未指定なら通常の情景背景。詳細は下記。 |
 | default_visual | cueにvisualがないときに使うローカル画像や映像。 |
 | visual_label | 映像の補足表示。例は情景イラストによる再構成。cue単位でも指定できる。 |
 | chapters | 章題の配列。cuesのchapterは0からの添字。 |
@@ -34,6 +35,25 @@ python3 "$skill/scripts/project.py" init "$HOME/Movies/新規の題材名"
 - 発話のあるcueにtext、voiceを入れる。pauseは発話後の静かな尺を秒で指定できる。初期値は0.23秒。読みが定まっている場合はreadingも残す。eyecatchはsecondsで表示尺を決め、必要に応じてtextに章題を設定し、効果音はaudioに置く。
 - cueのvisualで使用素材を選ぶ。motionはstill、push、video。videoはvisual_offsetで素材開始位置を指定できる。fitはcoverまたはcontain。余白のある画像、縦長コマ、注視点を切りたくない場合はcontainが使える。openingやclosingにはheadingを指定できる。
 - audioの要素にはkind（bgmまたはse）、file、title、url、at（開始するcueのID）を入れる。untilは終了するcueのIDまたはend。delay、offset、fadeは秒、gain_dbはdB。ループ利用が許され、繰り返しを試聴済みのBGMにはloopをtrueにできる。
+
+### ゲーム映像などの背景
+
+背景動画を指定すると、本編の挿絵の横に独立した動画欄を設ける。章や字幕が切り替わっても、背景の再生位置は全体のタイムラインから求める。背景の音声はミックスに使わない。
+
+```json
+{
+  "background": {
+    "file": "素材/走行映像.mp4",
+    "label": "GTA VI",
+    "source_title": "Grand Theft Auto VI ／ Rockstar Games",
+    "source_url": "https://www.rockstargames.com/VI/an-extended-look",
+    "fit": "cover",
+    "focus": 0.15
+  }
+}
+```
+
+labelは映像の確認結果に合わせる。自分で録画した素材ならsource_urlの代わりにoriginへself_recordedを指定できる。fitはcoverかcontain。coverのfocusは横の切り出し位置で0が左、1が右。ミニマップや両端の要素を残したければcontainを使う。offsetで背景動画の先頭からの位置を秒でずらせる。映像が短ければループするので、繰り返しが目立つときは前もって複数の走行カットを編集する。引用するゲーム素材の利用条件は公開方法に合わせて確認する。
 
 ### 音声と書き出し
 
